@@ -6,7 +6,7 @@
 %%% @end
 %%% Created : 09. Jun 2019 6:06 PM
 %%%-------------------------------------------------------------------
--module(test).
+-module(main).
 -author("jil").
 
 %% API
@@ -14,4 +14,5 @@
 
 
 start() ->
-io:fwrite("Hello").
+    bankData = file:consult("/home/jil/Concordia Summer 2019/Comparitive/Erlang_Project/src/banks").
+
