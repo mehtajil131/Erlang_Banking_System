@@ -15,4 +15,3 @@
 
 start() ->
     bankData = file:consult("/home/jil/Concordia Summer 2019/Comparitive/Erlang_Project/src/banks").
-
