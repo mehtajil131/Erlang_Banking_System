@@ -1,31 +1,30 @@
 -module(bank).
 
--export([bankTransactions/2]).
+-export([bankTransactions/3]).
 
 
-bankTransactions(BankName,BankVal) ->
-  recvLoanReq(BankName,BankVal).
+bankTransactions(BankName,BankVal,MID) ->
+  recvLoanReq(BankName,BankVal,MID).
 
-recvLoanReq(BankName,BankVal)->
+recvLoanReq(BankName,BankVal,MID)->
 
-  timer:sleep(100),
-
+  timer:sleep(200),
   receive
 
     {loan_request,Customer,LoanAmount,RandomBankId} ->
 
       if
         ( LoanAmount =< BankVal) ->
-          whereis(master_thread) ! {loan_approve_Message,Customer,LoanAmount,BankName},
+          MID ! {loan_approve_Message,BankName,LoanAmount,Customer},
           whereis(Customer) ! {loan_approve_Message_Cust,Customer,LoanAmount},
-          recvLoanReq(BankName,BankVal-LoanAmount);
+          recvLoanReq(BankName,BankVal-LoanAmount,MID);
         true ->
-          whereis(master_thread) ! {loan_deny_Message,Customer,LoanAmount,BankName},
+          MID ! {loan_deny_Message,BankName,LoanAmount,Customer},
           whereis(Customer) ! {loan_deny_Message_Cust,Customer,LoanAmount,RandomBankId}
 
       end
   after
-    1000->
+    5000->
       io:fwrite("Process  has received no calls for 1 second, ending...~n")
 
   end.
