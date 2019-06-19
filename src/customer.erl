@@ -1,59 +1,62 @@
 -module(customer).
 
--export([customerBanking/4]).
+-export([customerBanking/5]).
 
 
-customerBanking(Customer,Loan_amt,BankList,MID) ->
-  sendLoanReq(Customer,Loan_amt,BankList,MID).
+customerBanking(Customer,Loan_amt,BankList,MID,TotalAmtReq) ->
+  sendLoanReq(Customer,Loan_amt,BankList,MID,TotalAmtReq).
 
-sendLoanReq(Customer,Loan_amt,BankList,MID)->
+sendLoanReq(Customer,Loan_amt,BankList,MID,TotalAmtReq)->
 
-  timer:sleep(200),
+  timer:sleep(100),
+
+  BankTotalLength = length(BankList),
   if
-    (Loan_amt < 50) and (Loan_amt>0) ->
-      RandomAmt = random:uniform(Loan_amt);
+    (BankTotalLength == 0 ) or (Loan_amt == 0) ->
+      if Loan_amt == 0 ->
+        MID ! {loan_successfull,Customer,TotalAmtReq};
+        true->
+          MID ! {loan_failed,Customer,TotalAmtReq}
+      end;
     true ->
-      RandomAmt = random:uniform(50)
-  end,
+      if
+        (Loan_amt < 50) and (Loan_amt>0) ->
+          RandomAmt = rand:uniform(Loan_amt);
+        true ->
+          RandomAmt = rand:uniform(50)
+      end,
+
+      if
+        BankTotalLength == 1 ->
+          RandomBankId = 1;
+        true ->
+          RandomBankId = rand:uniform(BankTotalLength)
+      end,
+
+      {RandomBankName,_} = lists:nth(RandomBankId,BankList),
+
+      MID ! {loan_request_Message,Customer,RandomAmt,RandomBankName},
+      whereis(RandomBankName) ! {loan_request,Customer,RandomAmt,RandomBankId},
+      receiveResponseFromBank(Customer,Loan_amt,BankList,MID,TotalAmtReq)
+  end.
 
 
-  RandomBankId = rand:uniform(length(BankList)),
-  {RandomBankName,_} = lists:nth(RandomBankId,BankList),
-
-  MID ! {loan_request_Message,Customer,RandomAmt,RandomBankName},
-
-  whereis(RandomBankName) ! {loan_request,Customer,RandomAmt,RandomBankId},
-  receiveResponseFromBank(Customer,RandomAmt,BankList,MID).
-
-
-receiveResponseFromBank(Customer,Amount,BankList,MID) ->
+receiveResponseFromBank(Customer,Amount,BankList,MID,TotalAmtReq) ->
   receive
     {loan_approve_Message_Cust,Customer,LoanAmount} ->
+        sendLoanReq(Customer,Amount - LoanAmount,BankList,MID,TotalAmtReq+LoanAmount);
 
-      BankTotalLength = length(BankList),
-      if
-        (BankTotalLength == 0 ) or (LoanAmount == 0) ->
-          if LoanAmount == 0 ->
-            MID ! {loan_successfull,Customer,LoanAmount};
-          true->
-            MID ! {loan_failed,Customer,LoanAmount}
-          end;
-      true ->
-        sendLoanReq(Customer,Amount-LoanAmount,BankList,MID),
-        receiveResponseFromBank(Customer,Amount-LoanAmount,BankList,MID)
-      end;
+    {loan_deny_Message_Cust,Customer,RandomBankId} ->
+      Tuple = lists:nth(RandomBankId,BankList),
+      UpdatedBankList = lists:delete(Tuple,BankList),
+        sendLoanReq(Customer,Amount,UpdatedBankList,MID,TotalAmtReq)
 
-    {loan_deny_Message_Cust,Customer,LoanAmount,RandomBankId} ->
-      UpdatedBankList = lists:delete(RandomBankId,BankList),
-      if
-        UpdatedBankList == [] or (LoanAmount == 0) ->
-          if LoanAmount == 0 ->
-            MID ! {loan_successfull,Customer,LoanAmount};
-            true->
-              MID ! {loan_failed,Customer,LoanAmount}
-          end;
-          true ->
-        sendLoanReq(Customer,Amount-LoanAmount,UpdatedBankList,MID),
-        receiveResponseFromBank(Customer,Amount-LoanAmount,UpdatedBankList,MID)
-      end
+  after 1000->
+    io:fwrite("~p Process has received no calls for 1 seconds, ending...~n",[Customer]),
+    if Amount == 0 ->
+      MID ! {loan_successfull,Customer,TotalAmtReq};
+      true->
+        MID ! {loan_failed,Customer,TotalAmtReq}
+    end
+
   end.
